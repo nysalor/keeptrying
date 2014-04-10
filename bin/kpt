@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+require 'keeptrying'
+
+Keeptrying::Command.run ARGV

@@ -37,7 +37,7 @@ module Keeptrying
       entries.insert tag_id: tag_id(tag), body: body, utc: Time.now.to_i
     end
 
-    def select(from = nil, to = nil, tag = nil, done_flag = false)
+    def query(from = nil, to = nil, tag = nil, done_flag = false)
       @entries = entries.where done: done_flag ? 1 : 0
       if from
         @entries = entries.where('utc >= ? ', from.to_i)

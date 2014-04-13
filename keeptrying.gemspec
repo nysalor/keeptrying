@@ -23,4 +23,10 @@ Gem::Specification.new do |spec|
   spec.add_dependency "sqlite3"
   spec.add_dependency "sequel"
   spec.add_dependency "colored"
+
+  spec.add_development_dependency "rspec"
+  spec.add_development_dependency "timecop"
+  spec.add_development_dependency "pry"
+  spec.add_development_dependency "pry-nav"
+  spec.add_development_dependency "faker"
 end

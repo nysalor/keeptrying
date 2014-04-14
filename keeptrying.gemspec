@@ -8,9 +8,9 @@ Gem::Specification.new do |spec|
   spec.version       = Keeptrying::VERSION
   spec.authors       = ["Jun Yokoyama"]
   spec.email         = ["jun@larus.org"]
-  spec.summary       = %q{TODO: Write a short summary. Required.}
-  spec.description   = %q{TODO: Write a longer description. Optional.}
-  spec.homepage      = ""
+  spec.summary       = %q{command line tool for KPT meeting.}
+  spec.description   = %q{support write and read note for KPT meeting by command line.}
+  spec.homepage      = "https://github.com/nysalor/keeptrying"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0")

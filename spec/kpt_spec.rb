@@ -23,6 +23,10 @@ describe "Keeptrying" do
         table.truncate
       end
 
+      after(:all) do
+        File.delete db_file
+      end
+
       it "dbが存在しない場合に作成されること" do
         File.should be_exists(db_file)
       end

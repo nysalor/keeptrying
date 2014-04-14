@@ -2,15 +2,15 @@
 require File.expand_path(File.dirname(__FILE__) + '/spec_helper')
 
 describe "Keeptrying" do
+  include FixtureHelpers
+
   let(:db_file) { "./kpt_test.sql" }
   let(:tags) { [:keep, :problem, :try] }
   let(:sentence) { Faker::Lorem.sentence }
   let(:table) { Keeptrying::Kpt.db[:entries] }
   let(:all_entries) { table.all }
-  let(:three_sentences) { 3.times.map{ Faker::Lorem.sentence } }
-  let(:five_sentences) { 5.times.map{ Faker::Lorem.sentence } }
-  let(:past) { Time.local(2014, 4, 1, 10, 0, 0) }
-  let(:recent) { Time.local(2014, 4, 3, 10, 0, 0) }
+  let(:past_time) { Time.local(2014, 4, 1, 10, 0, 0) }
+  let(:recent_time) { Time.local(2014, 4, 3, 10, 0, 0) }
 
   describe "Kpt" do
     describe "initialize" do
@@ -32,120 +32,76 @@ describe "Keeptrying" do
       end
 
       it "writeで内容が書き込まれること" do
-        @kpt.write :keep, sentence
+        create_entry sentence
         all_entries.last[:body].should eq(sentence)
       end
 
       it "getで内容が取得できること" do
-        @kpt.write :problem, sentence
+        create_entry sentence
         @kpt.query
         @kpt.get.last[:body].should eq(sentence)
       end
 
-      it "getで指定した件数分の内容が取得できること" do
-        20.times.each do |idx|
-          tag = tags.sample
-          @kpt.write tag, sentence
-        end
-        @kpt.query
-        @kpt.get(5).all.size.should eq(5)
-      end
-
-      it "時間を指定して内容が取得できること" do
-        Timecop.freeze(past) do
-          three_sentences.each do |s|
-            tag = [:keep, :problem, :try].sample
-            @kpt.write tag, s
-          end
-        end
-
-        Timecop.freeze(recent) do
-          five_sentences.each do |s|
-            tag = [:keep, :problem, :try].sample
-            @kpt.write tag, s
-          end
-        end
-
-        @kpt.query((past.to_i - 60), (recent.to_i - 60))
-        @kpt.get.map{ |x| x[:body] }.should =~ three_sentences
-      end
-
-      it "タグを指定して内容が取得できること" do
-        three_sentences.each do |s|
-          @kpt.write :keep, s
-        end
-        five_sentences.each do |s|
-          @kpt.write :problem, s
-        end
-        @kpt.query nil, nil, :keep
-        @kpt.get.map{ |x| x[:body] }.should =~ three_sentences
-      end
-
       it "doneで処理済みになること" do
-        @kpt.write :keep, sentence
+        create_entry
         @kpt.query
         @kpt.done
         all_entries.last[:done].should eq(1)
       end
 
-      it "期間を指定して処理済みになること" do
-        Timecop.freeze(past) do
-          three_sentences.each do |s|
-            tag = [:keep, :problem, :try].sample
-            @kpt.write tag, s
-          end
-        end
-
-        Timecop.freeze(recent) do
-          five_sentences.each do |s|
-            tag = [:keep, :problem, :try].sample
-            @kpt.write tag, s
-          end
-        end
-
-        @kpt.query((past.to_i - 60), (recent.to_i - 60))
-        @kpt.done
-        all_entries.select{ |x| x[:done] > 0 }.
-          map{ |x| x[:body] }.should =~ three_sentences
+      it "タグを指定して内容が取得できること" do
+        sentences = 5.times.map{ random_sentence }
+        sentences[0, 3].each { |sentence| @kpt.write(:keep, sentence) }
+        sentences[3, 2].each { |sentence| @kpt.write(:problem, sentence) }
+        @kpt.query nil, nil, :keep
+        @kpt.get.map{ |x| x[:body] }.should =~ sentences[0,3]
       end
 
-      it "処理済みの内容が取得されないこと" do
-        Timecop.freeze(past) do
-          three_sentences.each do |s|
-            tag = [:keep, :problem, :try].sample
-            @kpt.write tag, s
+      describe "collections by timeline" do
+        before do
+          @sentences = 5.times.map { random_sentence }
+          Timecop.freeze(past_time) do
+            @sentences[0, 3].each { |sentence| create_entry(sentence,) }
+          end
+
+          Timecop.freeze(recent_time) do
+            @sentences[3, 2].each { |sentence| create_entry(sentence) }
           end
         end
 
-        Timecop.freeze(recent) do
-          five_sentences.each do |s|
-            tag = [:keep, :problem, :try].sample
-            @kpt.write tag, s
-          end
+        it "getで指定した件数分の内容が取得できること" do
+          @kpt.query
+          @kpt.get(2).all.size.should eq(2)
         end
 
-        @kpt.query((past.to_i - 60), (recent.to_i - 60))
-        @kpt.done
-
-        @kpt_after = Keeptrying::Kpt.new
-        @kpt_after.query
-        @kpt_after.get.map{ |x| x[:body] }.should =~ five_sentences
-      end
-
-      it "処理済みの内容を取得できること" do
-        Timecop.freeze(past) do
-          three_sentences.each do |s|
-            tag = [:keep, :problem, :try].sample
-            @kpt.write tag, s
-          end
+        it "時間を指定して内容が取得できること" do
+          @kpt.query((past_time.to_i - 60), (recent_time.to_i - 60))
+          @kpt.get.map{ |x| x[:body] }.should =~ @sentences[0, 3]
         end
 
-        @kpt.query
-        @kpt.done
+        describe "processed entries" do
+          before do
+            @kpt.query((past_time.to_i - 60), (recent_time.to_i - 60))
+            @kpt.done
+          end
 
-        @kpt_after = Keeptrying::Kpt.new
-        @kpt_after.query nil, nil, nil, true
-        @kpt_after.get.map{ |x| x[:body] }.should =~ three_sentences
+          it "期間を指定して処理済みになること" do
+            all_entries.select{ |x| x[:done] > 0 }.
+              map{ |x| x[:body] }.should =~ @sentences[0, 3]
+          end
+
+          it "処理済みの内容が取得されないこと" do
+            kpt_after = Keeptrying::Kpt.new
+            kpt_after.query
+            kpt_after.get.map{ |x| x[:body] }.should =~ @sentences[3, 2]
+          end
+
+          it "処理済みを含めた内容を取得できること" do
+            kpt_after = Keeptrying::Kpt.new
+            kpt_after.query nil, nil, nil, true
+            kpt_after.get.size.should eq(5)
+          end
+        end
       end
     end
   end

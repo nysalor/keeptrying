@@ -63,6 +63,10 @@ module Keeptrying
       entries.update done: 1
     end
 
+    def truncate
+      entries.delete
+    end
+
     def tags
       [:keep, :problem, :try]
     end

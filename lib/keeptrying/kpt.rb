@@ -34,45 +34,11 @@ module Keeptrying
     end
 
     def write(tag, body)
-      entries.insert tag_id: tag_id(tag), body: body, utc: Time.now.to_i
+      entries.insert tag_id: Keeptrying.tag_id(tag), body: body, utc: Time.now.to_i
     end
 
-    def query(from = nil, to = nil, tag = nil, all = false)
-      @entries = all ? entries : entries.where(done: 0)
-
-      if from
-        @entries = entries.where('utc >= ? ', from.to_i)
-      end
-      if to
-        @entries = entries.where('utc <= ?', to.to_i)
-      end
-      if tag
-        @entries = entries.where(tag_id: tag_id(tag))
-      end
-    end
-
-    def get(num = nil)
-      if num
-        entries.limit num
-      else
-        entries.all
-      end
-    end
-
-    def done
-      entries.update done: 1
-    end
-
-    def truncate
-      entries.delete
-    end
-
-    def tags
-      [:keep, :problem, :try]
-    end
-
-    def tag_id(tag)
-      tags.index tag
+    def query
+      Keeptrying::Query.new(entries)
     end
 
     private

@@ -1,14 +1,14 @@
 module Keeptrying
   class Command
     def self.run(argv)
-      new(argv).execute
+      new(argv).run
     end
 
     def initialize(argv)
       @argv = argv
     end
 
-    def execute
+    def run
       parse_args
       parse_days
       case @action
@@ -32,15 +32,17 @@ module Keeptrying
     private
 
     def show
-      parse_days
-      kpt.query @from, @to, @tag
-      output kpt.get
+      query.tag = @tag if @tag
+      query.prepare
+      output query.get
     end
 
     def all
-      parse_days
-      kpt.query @from, @to, @tag, true
-      output kpt.get
+      query.with_done = true
+      query.only_done = false
+      query.tag = @tag if @tag
+      query.prepare
+      output query.get
     end
 
     def write
@@ -60,21 +62,15 @@ module Keeptrying
     end
 
     def done
-      @days = @argv[1].to_i
-      if @days > 0
-        kpt.query @from, @to
-      else
-        kpt.query
-      end
-      kpt.done
+      query.with_done = false
+      query.prepare
+      query.done
     end
 
     def truncate
-      @days = @argv[1].to_i
-      if @days > 0
-        kpt.query @from, @to
-        kpt.truncate
-      end
+      query.only_done = true
+      query.prepare
+      query.truncate
     end
 
     def help
@@ -95,7 +91,7 @@ module Keeptrying
 
     def parse_days
       @today = Date.today
-      if %w(done truncate).include?(@action)
+      if ['done', 'truncate'].include?(@action)
         @days = @argv[1].to_i
         @from = 0
         @to = ago(@days)
@@ -104,6 +100,8 @@ module Keeptrying
         @to = Time.now
         @from = ago(@days)
       end
+      query.from = @from
+      query.to = @to
     end
 
     def parse_args
@@ -144,11 +142,15 @@ module Keeptrying
       @kpt ||= Kpt.new
     end
 
+    def query
+      @query ||= kpt.query
+    end
+
     def colored_tag(id)
       color = [:blue, :red, :yellow]
-      kpt.tags[id].to_s.send(color[id])
+      Keeptrying.tag(id).to_s.send(color[id])
     end
- 
+
     def ago(days)
       (Date.today - days.to_i).to_time
     end

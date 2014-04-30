@@ -14,6 +14,7 @@ describe "Keeptrying" do
   let(:recent_time) { Time.local(2014, 4, 3, 10, 0, 0) }
   let(:now) { Time.local(2014, 4, 4, 0, 0, 0) }
   let(:sentences) { 3.times.map { Faker::Lorem.sentence } }
+  let(:query) { @kpt.query }
 
   before do
     Keeptrying::Kpt.stub(:db_file).and_return(db_file)
@@ -38,16 +39,14 @@ describe "Keeptrying" do
       all_entries.last[:body].should eq(sentence)
     end
 
-    it "getで内容が取得できること" do
+    it "内容が取得できること" do
       @kpt.write tag, sentence
-      @kpt.query
-      @kpt.get.last[:body].should eq(sentence)
+      query.get.last[:body].should eq(sentence)
     end
 
     it "doneで処理済みになること" do
       create_entry
-      @kpt.query
-      @kpt.done
+      query.done
       all_entries.last[:done].should eq(1)
     end
 
@@ -55,8 +54,8 @@ describe "Keeptrying" do
       sentences = 5.times.map{ random_sentence }
       sentences[0, 3].each { |sentence| @kpt.write(:keep, sentence) }
       sentences[3, 2].each { |sentence| @kpt.write(:problem, sentence) }
-      @kpt.query nil, nil, :keep
-      @kpt.get.map{ |x| x[:body] }.should =~ sentences[0,3]
+      query.tag = :keep
+      query.get.map{ |x| x[:body] }.should =~ sentences[0,3]
     end
 
     describe "collections by timeline" do
@@ -71,20 +70,21 @@ describe "Keeptrying" do
         end
       end
 
-      it "getで指定した件数分の内容が取得できること" do
-        @kpt.query
-        @kpt.get(2).all.size.should eq(2)
+      it "指定した件数分の内容が取得できること" do
+        query.get(2).size.should eq(2)
       end
 
       it "時間を指定して内容が取得できること" do
-        @kpt.query((past_time.to_i - 60), (recent_time.to_i - 60))
-        @kpt.get.map{ |x| x[:body] }.should =~ @sentences[0, 3]
+        query.from = past_time.to_i - 60
+        query.to = recent_time.to_i - 60
+        query.get.map{ |x| x[:body] }.should =~ @sentences[0, 3]
       end
 
       describe "processed entries" do
         before do
-          @kpt.query((past_time.to_i - 60), (recent_time.to_i - 60))
-          @kpt.done
+          query.from = past_time.to_i - 60
+          query.to = recent_time.to_i - 60
+          query.done
         end
 
         it "期間を指定して処理済みになること" do
@@ -93,15 +93,14 @@ describe "Keeptrying" do
         end
 
         it "処理済みの内容が取得されないこと" do
-          kpt_after = Keeptrying::Kpt.new
-          kpt_after.query
-          kpt_after.get.map{ |x| x[:body] }.should =~ @sentences[3, 2]
+          new_query = @kpt.query
+          new_query.get.map{ |x| x[:body] }.should =~ @sentences[3, 2]
         end
 
         it "処理済みを含めた内容を取得できること" do
-          kpt_after = Keeptrying::Kpt.new
-          kpt_after.query nil, nil, nil, true
-          kpt_after.get.size.should eq(5)
+          new_query = @kpt.query
+          new_query.with_done = true
+          new_query.get.size.should eq(5)
         end
       end
     end
@@ -124,7 +123,7 @@ describe "Keeptrying" do
 
     it "showで内容が表示されること" do
       command.run ['write', "-#{tag[0]}", sentence]
-      capture(:stdout) { command.run ['show'] }.should be_include(sentence) 
+      capture(:stdout) { command.run ['show'] }.should be_include(sentence)
     end
 
     it "showで特定のタグの内容が表示されること" do
@@ -133,10 +132,20 @@ describe "Keeptrying" do
       command.run ['write', "-t", sentences[2]]
       capture(:stdout) {
         command.run ['show', '-k']
-      }.should be_include(sentences[0]) 
+      }.should be_include(sentences[0])
       capture(:stdout) {
         command.run ['show', '-k']
-      }.should_not be_include(sentences[1]) 
+      }.should_not be_include(sentences[1])
+    end
+
+    it "実行後に検索条件が初期化されていること" do
+      command.run ['write', "-k", sentences[0]]
+      command.run ['write', "-p", sentences[1]]
+      command.run ['write', "-t", sentences[2]]
+      command.run ['show', '-k']
+      capture(:stdout) {
+        command.run ['show']
+      }.should be_include(sentences[2])
     end
 
     describe "day range" do
@@ -154,26 +163,26 @@ describe "Keeptrying" do
         Timecop.freeze(now) do
           capture(:stdout) {
             command.run ['show', '-t', 1]
-          }.should be_include(sentences[2]) 
+          }.should be_include(sentences[2])
           capture(:stdout) {
             command.run ['show', '-k', 1]
-          }.should_not be_include(sentences[0]) 
+          }.should_not be_include(sentences[0])
         end
       end
 
       it "doneで全ての内容が処理済みになること" do
         command.run ['done']
-        all_entries.last[:done].should eq(1)
+        all_entries.all? { |x| x[:done] == 1 }
       end
 
       it "showで処理済みの内容が表示されないこと" do
         command.run ['done']
         capture(:stdout) {
           command.run ['show', '-t', 1]
-        }.should_not be_include(sentences[2]) 
+        }.should_not be_include(sentences[2])
         capture(:stdout) {
           command.run ['show', '-k', 1]
-        }.should_not be_include(sentences[0]) 
+        }.should_not be_include(sentences[0])
       end
 
       it "doneで特定の日数以上の内容が処理済みになること" do
@@ -187,20 +196,28 @@ describe "Keeptrying" do
         command.run ['done']
         capture(:stdout) {
           command.run ['all']
-        }.should_not be_include(sentences[0]) 
+        }.should_not be_include(sentences[0])
       end
 
       it "truncateで特定の日数以上の処理済みの内容が削除されること" do
+        command.run ['done']
         Timecop.freeze(now) do
           command.run ['truncate', 1]
         end
         all_entries.count.should eq(1)
       end
 
+      it "truncateで処理済みでない内容が削除されないこと" do
+        Timecop.freeze(now) do
+          command.run ['truncate', 1]
+        end
+        all_entries.count.should eq(3)
+      end
+
       it "helpでヘルプが表示されること" do
         capture(:stdout) {
           command.run ['help']
-        }.should be_include('usage') 
+        }.should be_include('usage')
       end
     end
   end

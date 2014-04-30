@@ -1,24 +1,46 @@
 # Keeptrying
 
-TODO: Write a gem description
+tool for KPT note
 
 ## Installation
-
-Add this line to your application's Gemfile:
-
-    gem 'keeptrying'
-
-And then execute:
-
-    $ bundle
-
-Or install it yourself as:
 
     $ gem install keeptrying
 
 ## Usage
 
-TODO: Write usage instructions here
+### show KPT entries
+
+	$ kpt show [-k|p|t] [days] (or kpt s)
+
+### write a KPT entry (if omit message, open editor)
+
+	$ kpt write -k|p|t [message] (or kpt w)
+
+### mark with "done" flag.
+
+	$ kpt done [days] (or kpt d)
+
+### show entries (includes "done" entries)
+
+	$ kpt all [-k|-p|-t] [days] (or kpt a)
+
+### delete old entries (only with "done" flag)
+
+	$ kpt truncate days (or kpt t)
+
+## other options
+
+### specify database file
+
+	$ KPT_DB=~/databases/kpt.sqlite kpt show
+
+### specify editor
+
+	$ EDITOR=emacs kpt write -k
+
+### uninstall
+
+	unlink ~/.kpt directory (or specified database file)
 
 ## Contributing
 
